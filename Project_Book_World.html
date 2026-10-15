@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="uk" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Книжкова Країна — Львів | Інтерактивний навігатор</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              900: '#070C1E',
+              800: '#0B132B',
+              700: '#1C2541',
+              600: '#2A365C',
+              accent: '#00F0FF',
+              blue: '#3A86FF',
+              glow: 'rgba(0, 240, 255, 0.15)'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+    
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #070C1E;
+      color: #E2E8F0;
+    }
+
+    /* Стилі для темної карти OpenStreetMap */
+    .dark-map-tiles {
+      filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
+    }
+
+    .leaflet-container {
+      background: #0B132B !important;
+      font-family: inherit;
+    }
+
+    .glass-card {
+      background: rgba(11, 19, 43, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .glass-card:hover {
+      border-color: rgba(0, 240, 255, 0.3);
+      box-shadow: 0 8px 32px 0 rgba(0, 240, 255, 0.1);
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #070C1E;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #1C2541;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #00F0FF;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between custom-scrollbar">
+
+  <!-- Навігаційна шапка -->
+  <header class="sticky top-0 z-40 glass-card border-b border-slate-800/80 bg-brand-900/90 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-blue to-brand-accent flex items-center justify-center text-brand-900 font-extrabold text-xl shadow-lg shadow-brand-accent/20">
+          <i class="fa-solid fa-compass"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-black text-xl tracking-tight text-white">КНИЖКОВА КРАЇНА</h1>
+            <span class="bg-brand-accent/10 text-brand-accent border border-brand-accent/30 text-xs px-2 py-0.5 rounded-full font-semibold">ЛЬВІВ 2027</span>
+          </div>
+          <p class="text-xs text-slate-400">Інтерактивний навігатор подій та локацій</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <div class="hidden md:flex items-center gap-6 text-xs text-slate-300 border-r border-slate-800 pr-6">
+          <div>
+            <span class="text-slate-500 block uppercase tracking-wider text-[10px]">Дати проведения</span>
+            <span class="font-bold text-white">18–20 Вересня 2027</span>
+          </div>
+          <div>
+            <span class="text-slate-500 block uppercase tracking-wider text-[10px]">Локацій у Львові</span>
+            <span class="font-bold text-brand-accent">6 майданчиків</span>
+          </div>
+        </div>
+
+        <button onclick="toggleScheduleDrawer()" class="relative bg-brand-700 hover:bg-brand-600 text-white font-medium px-4 py-2.5 rounded-xl border border-slate-700 transition flex items-center gap-2 text-sm">
+          <i class="fa-solid fa-bookmark text-brand-accent"></i>
+          <span>Мій Розклад</span>
+          <span id="scheduleBadge" class="bg-brand-accent text-brand-900 font-bold text-xs px-2 py-0.5 rounded-full ml-1">0</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Головний контент -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-8">
+
+    <!-- Верхня панель -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- Ліва картка -->
+      <div class="lg:col-span-4 glass-card rounded-2xl p-6 flex flex-col justify-between relative overflow-hidden">
+        <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-brand-accent/5 rounded-full blur-2xl pointer-events-none"></div>
+
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <span class="inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs px-2.5 py-1 rounded-full font-medium">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Розосереджений Фестиваль
+            </span>
+            <span class="text-xs text-slate-400">Вхід вільний</span>
+          </div>
+
+          <h2 class="text-2xl font-bold text-white mb-2 leading-tight">Навігатор Культурних Подій</h2>
+          <p class="text-slate-400 text-sm mb-6 leading-relaxed">
+            Оберіть захід, інтерактивно знайдіть книгарню на карті Львова та збережіть власну програму відвідування.
+          </p>
+
+          <!-- Таймер зворотного відліку -->
+          <div class="bg-brand-800/80 rounded-xl p-4 border border-slate-800 mb-6">
+            <div class="flex justify-between items-center text-xs text-slate-400 mb-2">
+              <span class="font-medium flex items-center gap-1.5 text-brand-accent">
+                <i class="fa-regular fa-clock"></i> До початку подій:
+              </span>
+              <span>18 ВЕРЕСНЯ 2027</span>
+            </div>
+            <div class="grid grid-cols-4 gap-2 text-center">
+              <div class="bg-brand-900 p-2 rounded-lg border border-slate-800">
+                <span id="timerDays" class="block font-extrabold text-lg text-white">00</span>
+                <span class="text-[10px] text-slate-500 uppercase">Днів</span>
+              </div>
+              <div class="bg-brand-900 p-2 rounded-lg border border-slate-800">
+                <span id="timerHours" class="block font-extrabold text-lg text-white">00</span>
+                <span class="text-[10px] text-slate-500 uppercase">Годин</span>
+              </div>
+              <div class="bg-brand-900 p-2 rounded-lg border border-slate-800">
+                <span id="timerMinutes" class="block font-extrabold text-lg text-white">00</span>
+                <span class="text-[10px] text-slate-500 uppercase">Хвилин</span>
+              </div>
+              <div class="bg-brand-900 p-2 rounded-lg border border-slate-800">
+                <span id="timerSeconds" class="block font-extrabold text-lg text-white">00</span>
+                <span class="text-[10px] text-slate-500 uppercase">Секунд</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Інформація про автора -->
+        <div class="pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs">
+          <div class="flex items-center gap-2 text-slate-300">
+            <i class="fa-solid fa-graduation-cap text-brand-accent"></i>
+            <span>ПЗІП-12 | <strong>Бурко П.В.</strong></span>
+          </div>
+          <span class="text-slate-500">ЛНУ / МПЗ</span>
+        </div>
+      </div>
+
+      <!-- Карта Leaflet -->
+      <div class="lg:col-span-8 glass-card rounded-2xl p-2 relative min-h-[380px] flex flex-col">
+        <div id="map" class="w-full h-full rounded-xl z-10 flex-1 min-h-[360px]"></div>
+        <div class="absolute bottom-4 right-4 z-20 bg-brand-900/90 backdrop-blur border border-slate-800 px-3 py-1.5 rounded-lg text-xs text-slate-300 pointer-events-none">
+          <i class="fa-solid fa-circle-info text-brand-accent mr-1"></i> Натисніть картку події для фокусування карты
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Пошук та фільтри -->
+    <div class="flex flex-col md:flex-row items-center justify-between gap-4 glass-card p-4 rounded-xl">
+      <div class="relative w-full md:w-80">
+        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3.5 text-slate-500 text-sm"></i>
+        <input type="text" id="searchInput" oninput="filterEvents()" placeholder="Пошук авторів, книгарень, тем..." 
+               class="w-full bg-brand-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-accent transition">
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+        <button onclick="setCategoryFilter('all')" class="filter-btn active bg-brand-accent text-brand-900 font-semibold px-4 py-2 rounded-lg text-xs transition">Усі категорії</button>
+        <button onclick="setCategoryFilter('презентація')" class="filter-btn bg-brand-800 hover:bg-brand-700 text-slate-300 px-4 py-2 rounded-lg text-xs border border-slate-800 transition">Презентації</button>
+        <button onclick="setCategoryFilter('дискусія')" class="filter-btn bg-brand-800 hover:bg-brand-700 text-slate-300 px-4 py-2 rounded-lg text-xs border border-slate-800 transition">Дискусії</button>
+        <button onclick="setCategoryFilter('поезія')" class="filter-btn bg-brand-800 hover:bg-brand-700 text-slate-300 px-4 py-2 rounded-lg text-xs border border-slate-800 transition">Поезія</button>
+        <button onclick="setCategoryFilter('дитяча')" class="filter-btn bg-brand-800 hover:bg-brand-700 text-slate-300 px-4 py-2 rounded-lg text-xs border border-slate-800 transition">Дитяче</button>
+      </div>
+    </div>
+
+    <!-- Сітка подій -->
+    <div>
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-calendar-days text-brand-accent"></i> Програма заходів
+        </h3>
+        <span id="eventsCount" class="text-xs text-slate-400">Знайдено: 6 подій</span>
+      </div>
+
+      <div id="eventsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Генерується через JS -->
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Підвал -->
+  <footer class="border-t border-slate-800/80 bg-brand-900/80 py-6 mt-12">
+    <div class="max-w-7xl mx-auto px-4 text-center sm:flex sm:justify-between sm:text-left text-xs text-slate-500">
+      <p>© 2027 Книжкова Країна — Львівський Навігатор. Лабораторна робота №1.</p>
+      <p class="mt-2 sm:mt-0">Розробив: <strong class="text-slate-300">Бурко П.В.</strong> (Група ПЗІП-12)</p>
+    </div>
+  </footer>
+
+  <!-- Панель розкладу -->
+  <div id="scheduleDrawer" class="fixed inset-y-0 right-0 w-full max-w-md bg-brand-800 border-l border-slate-700 z-50 transform translate-x-full transition-transform duration-300 ease-in-out p-6 flex flex-col">
+    <div class="flex items-center justify-between border-b border-slate-700 pb-4 mb-4">
+      <h3 class="font-bold text-lg text-white flex items-center gap-2">
+        <i class="fa-solid fa-bookmark text-brand-accent"></i> Збережені події
+      </h3>
+      <button onclick="toggleScheduleDrawer()" class="text-slate-400 hover:text-white text-xl p-1">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    
+    <div id="scheduleList" class="flex-1 overflow-y-auto custom-scrollbar space-y-4">
+      <!-- Збережені елементи -->
+    </div>
+
+    <div class="pt-4 border-t border-slate-700 mt-auto">
+      <button onclick="clearSchedule()" class="w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 font-medium py-2.5 rounded-xl text-xs transition">
+        Очистити увесь розклад
+      </button>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    const eventsData = [
+      {
+        id: 1,
+        title: "Презентація роману «Загадкова застава»",
+        author: "Макс Кідрук",
+        location: "Видавництво Старого Лева",
+        address: "вул. Галицька, 17",
+        date: "18 вересня 2027",
+        time: "15:00 - 16:30",
+        category: "презентація",
+        lat: 49.8402,
+        lng: 24.0315,
+        desc: "Ексклюзивна презентація нового трилера з елементами фантастики від одного з найпопулярніших авторів України."
+      },
+      {
+        id: 2,
+        title: "Дискусія: «Сучасна поезія в часи змін»",
+        author: "Катерина Калитко, Мар'яна Савка",
+        location: "Книгарня Є",
+        address: "просп. Свободи, 7",
+        date: "18 вересня 2027",
+        time: "17:00 - 18:30",
+        category: "дискусія",
+        lat: 49.8415,
+        lng: 24.0278,
+        desc: "Розмова про роль поетичного слова, культурну деколонізацію та нову хвилю української літератури."
+      },
+      {
+        id: 3,
+        title: "Поетичний вечір під відкритим небом",
+        author: "Павло Вишебаба",
+        location: "Книжковий Лев",
+        address: "вул. Вірменська, 33",
+        date: "19 вересня 2027",
+        time: "18:00 - 20:00",
+        category: "поезія",
+        lat: 49.8431,
+        lng: 24.0322,
+        desc: "Акустичний вечір військової та цивільної поезії у затишному дворику в самому серці старого Львова."
+      },
+      {
+        id: 4,
+        title: "Майстер-клас: «Створення дитячої ілюстрації»",
+        author: "Творча майстерня «Аґрафка»",
+        location: "Наш Формат",
+        address: "вул. Валова, 21",
+        date: "19 вересня 2027",
+        time: "12:00 - 14:00",
+        category: "дитяча",
+        lat: 49.8392,
+        lng: 24.0341,
+        desc: "Інтерактивний інтерактив для дітей та батьків з малювання графічних новел та дитячих книжок-картинок."
+      },
+      {
+        id: 5,
+        title: "Автограф-сесія та публічна розмова",
+        author: "Оксана Забужко",
+        location: "Readeat Lviv",
+        address: "вул. Коперника, 12",
+        date: "20 вересня 2027",
+        time: "16:00 - 17:30",
+        category: "презентація",
+        lat: 49.8385,
+        lng: 24.0255,
+        desc: "Обговорення нових есеїв та автограф-сесія для шанувальників інтелектуальної прози."
+      },
+      {
+        id: 6,
+        title: "Лекція: «Історія друкарства у Львові»",
+        author: "Проф. Іван Паславський",
+        location: "Музей Книги (Скансен)",
+        address: "вул. Чернеча Гора, 1",
+        date: "20 вересня 2027",
+        time: "14:00 - 15:30",
+        category: "дискусія",
+        lat: 49.8445,
+        lng: 24.0620,
+        desc: "Захоплююча мандрівка у минуле: від Івана Федорова до сучасних видавництв Львова."
+      }
+    ];
+
+    let mySchedule = JSON.parse(localStorage.getItem('lviv_book_schedule')) || [];
+    let activeCategory = 'all';
+    let map, markersGroup;
+
+    window.addEventListener('load', () => {
+      initMap();
+      renderEvents();
+      updateScheduleBadge();
+      initTimer();
+    });
+
+    function initMap() {
+      map = L.map('map').setView([49.8410, 24.0310], 14);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        className: 'dark-map-tiles',
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(map);
+
+      markersGroup = L.layerGroup().addTo(map);
+      updateMapMarkers(eventsData);
+    }
+
+    function updateMapMarkers(events) {
+      markersGroup.clearLayers();
+
+      events.forEach(ev => {
+        const marker = L.circleMarker([ev.lat, ev.lng], {
+          radius: 8,
+          fillColor: '#00F0FF',
+          color: '#ffffff',
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.9
+        });
+
+        marker.bindPopup(`
+          <div style="font-family: inherit; padding: 4px;">
+            <strong style="color: #070C1E; font-size: 13px; display:block;">${ev.title}</strong>
+            <span style="color: #3A86FF; font-size: 11px;">${ev.location} (${ev.address})</span><br>
+            <span style="color: #64748B; font-size: 11px;">${ev.date} | ${ev.time}</span>
+          </div>
+        `);
+
+        markersGroup.addLayer(marker);
+      });
+    }
+
+    function focusOnMap(lat, lng, title) {
+      map.flyTo([lat, lng], 16, { duration: 1.2 });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      showToast(`Карту сфокусовано на: ${title}`);
+    }
+
+    function renderEvents() {
+      const grid = document.getElementById('eventsGrid');
+      const searchVal = document.getElementById('searchInput').value.toLowerCase();
+
+      const filtered = eventsData.filter(ev => {
+        const matchesCategory = activeCategory === 'all' || ev.category === activeCategory;
+        const matchesSearch = ev.title.toLowerCase().includes(searchVal) || 
+                              ev.author.toLowerCase().includes(searchVal) || 
+                              ev.location.toLowerCase().includes(searchVal);
+        return matchesCategory && matchesSearch;
+      });
+
+      document.getElementById('eventsCount').innerText = `Знайдено: ${filtered.length} подій`;
+
+      if (filtered.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full py-12 text-center text-slate-500">
+            <i class="fa-solid fa-folder-open text-3xl mb-2"></i>
+            <p>За вашим запитом подій не знайдено</p>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = filtered.map(ev => {
+        const isSaved = mySchedule.includes(ev.id);
+        return `
+          <div class="glass-card rounded-2xl p-5 flex flex-col justify-between transition duration-300">
+            <div>
+              <div class="flex items-center justify-between text-xs mb-3">
+                <span class="bg-brand-accent/10 text-brand-accent px-2.5 py-1 rounded-full font-semibold border border-brand-accent/20 uppercase text-[10px]">
+                  ${ev.category}
+                </span>
+                <span class="text-slate-400 flex items-center gap-1">
+                  <i class="fa-regular fa-calendar"></i> ${ev.date}
+                </span>
+              </div>
+
+              <h4 class="font-bold text-white text-base mb-1 leading-snug">${ev.title}</h4>
+              <p class="text-brand-blue text-xs font-medium mb-3"><i class="fa-solid fa-pen-nib mr-1"></i> ${ev.author}</p>
+              
+              <p class="text-slate-400 text-xs line-clamp-2 mb-4 leading-relaxed">${ev.desc}</p>
+            </div>
+
+            <div>
+              <div class="bg-brand-900/80 p-2.5 rounded-xl border border-slate-800 text-xs mb-4 flex items-center justify-between">
+                <div>
+                  <span class="font-medium text-slate-200 block">${ev.location}</span>
+                  <span class="text-slate-500 text-[11px]">${ev.address}</span>
+                </div>
+                <span class="text-brand-accent font-semibold">${ev.time}</span>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2">
+                <button onclick="focusOnMap(${ev.lat}, ${ev.lng}, '${ev.location}')" class="bg-brand-800 hover:bg-brand-700 text-slate-200 py-2 px-3 rounded-xl text-xs font-medium border border-slate-700 transition flex items-center justify-center gap-1.5">
+                  <i class="fa-solid fa-location-dot text-brand-accent"></i> На карті
+                </button>
+                
+                <button onclick="toggleSaveEvent(${ev.id})" class="${isSaved ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' : 'bg-brand-700 hover:bg-brand-600 text-white border-slate-600'} py-2 px-3 rounded-xl text-xs font-medium border transition flex items-center justify-center gap-1.5">
+                  <i class="fa-solid ${isSaved ? 'fa-check' : 'fa-plus'}"></i> ${isSaved ? 'Збережено' : 'До розкладу'}
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      updateMapMarkers(filtered);
+    }
+
+    function setCategoryFilter(cat) {
+      activeCategory = cat;
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.remove('active', 'bg-brand-accent', 'text-brand-900', 'font-semibold');
+        btn.classList.add('bg-brand-800', 'text-slate-300');
+      });
+      event.target.classList.add('active', 'bg-brand-accent', 'text-brand-900', 'font-semibold');
+      event.target.classList.remove('bg-brand-800', 'text-slate-300');
+      renderEvents();
+    }
+
+    function filterEvents() {
+      renderEvents();
+    }
+
+    function toggleSaveEvent(id) {
+      const index = mySchedule.indexOf(id);
+      if (index === -1) {
+        mySchedule.push(id);
+        showToast("Подію додано до вашого розкладу!");
+      } else {
+        mySchedule.splice(index, 1);
+        showToast("Подію вилучено з розкладу");
+      }
+      localStorage.setItem('lviv_book_schedule', JSON.stringify(mySchedule));
+      updateScheduleBadge();
+      renderEvents();
+      renderScheduleDrawer();
+    }
+
+    function updateScheduleBadge() {
+      document.getElementById('scheduleBadge').innerText = mySchedule.length;
+    }
+
+    function toggleScheduleDrawer() {
+      const drawer = document.getElementById('scheduleDrawer');
+      drawer.classList.toggle('translate-x-full');
+      renderScheduleDrawer();
+    }
+
+    function renderScheduleDrawer() {
+      const list = document.getElementById('scheduleList');
+      const savedEvents = eventsData.filter(e => mySchedule.includes(e.id));
+
+      if (savedEvents.length === 0) {
+        list.innerHTML = `
+          <div class="text-center py-12 text-slate-500 text-xs">
+            <i class="fa-regular fa-bookmark text-3xl mb-2"></i>
+            <p>Ваш розклад поки порожній.</p>
+          </div>
+        `;
+        return;
+      }
+
+      list.innerHTML = savedEvents.map(ev => `
+        <div class="bg-brand-900 p-3.5 rounded-xl border border-slate-700 flex items-center justify-between">
+          <div>
+            <h5 class="font-bold text-white text-xs">${ev.title}</h5>
+            <p class="text-[11px] text-brand-accent">${ev.location} • ${ev.time}</p>
+          </div>
+          <button onclick="toggleSaveEvent(${ev.id})" class="text-slate-500 hover:text-red-400 p-2 text-sm">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function clearSchedule() {
+      mySchedule = [];
+      localStorage.removeItem('lviv_book_schedule');
+      updateScheduleBadge();
+      renderEvents();
+      renderScheduleDrawer();
+      showToast("Розклад повністю очищено");
+    }
+
+    function showToast(message) {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = "bg-brand-800 border border-brand-accent/40 text-white text-xs px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 transform transition duration-300 translate-y-2";
+      toast.innerHTML = `<i class="fa-solid fa-circle-check text-brand-accent"></i> ${message}`;
+      
+      container.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.classList.remove('translate-y-2');
+      }, 10);
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    function initTimer() {
+      // Встановлено майбутній дедлайн: 18 Вересня 2027 року
+      const targetDate = new Date('2027-09-18T10:00:00').getTime();
+
+      function update() {
+        const now = new Date().getTime();
+        const diff = targetDate - now;
+
+        if (diff > 0) {
+          const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+          const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+          const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+          const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+          document.getElementById('timerDays').innerText = days < 10 ? '0' + days : days;
+          document.getElementById('timerHours').innerText = hours < 10 ? '0' + hours : hours;
+          document.getElementById('timerMinutes').innerText = minutes < 10 ? '0' + minutes : minutes;
+          document.getElementById('timerSeconds').innerText = seconds < 10 ? '0' + seconds : seconds;
+        }
+      }
+
+      update();
+      setInterval(update, 1000);
+    }
+  </script>
+</body>
+</html>
