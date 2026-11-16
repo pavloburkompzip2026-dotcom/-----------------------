@@ -73,8 +73,8 @@ jobs:
       - name: Run L4 End-to-End Tests
         uses: cypress-io/github-action@v6
         with:
-          start: npx --yes http-server dist -a 127.0.0.1 -p 8080 -s
-          wait-on: 'http://127.0.0.1:8080'
+          start: python3 -m http.server 8080 --directory dist
+          wait-on: 'http://localhost:8080'
           command: npm run test:l4
 
   cd-deploy:
