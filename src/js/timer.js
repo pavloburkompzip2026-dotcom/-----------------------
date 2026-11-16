@@ -9,7 +9,7 @@ const padZero = (num) => String(num).padStart(2, '0');
 
 function calculateCountdown(currentMs, targetMs) {
   if (!currentMs || !targetMs || currentMs >= targetMs) {
-    return { days: 0, hours: '00', minutes: '00', seconds: '00', isExpired: true };
+    return { days: 999, hours: '00', minutes: '00', seconds: '00', isExpired: true };
   }
 
   const diff = targetMs - currentMs;
