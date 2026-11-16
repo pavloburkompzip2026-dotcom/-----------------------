@@ -1,0 +1,140 @@
+name: CI/CD Pipeline — Lviv Book Festival Navigator
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # СТАДІЯ 1 (CI): Збірка, статичний аналіз та тестування рівнів L1–L3
+  ci-build-and-test:
+    name: CI — Lint, Build & Pentagon L1–L3 Tests
+    runs-on: ubuntu-latest
+    environment:
+      name: test-environment
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Static Code Analysis (ESLint)
+        run: npm run lint
+
+      - name: Build Project Artifact
+        run: npm run build
+
+      - name: Run L1 (Unit) & L2 (Integration) Tests
+        run: npm run test:l1-l2
+
+      - name: Run L3 (System & Contract) Tests
+        run: npm run test:l3
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: book-festival-dist
+          path: dist/
+
+  # СТАДІЯ 2 (CI / Staging): Наскрізне E2E-тестування рівня L4
+  e2e-staging-tests:
+    name: Staging — Pentagon L4 E2E Tests (Cypress)
+    needs: ci-build-and-test
+    runs-on: ubuntu-latest
+    environment:
+      name: staging-environment
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: book-festival-dist
+          path: dist/
+
+      - name: Run L4 End-to-End Tests
+        uses: cypress-io/github-action@v6
+        with:
+          start: npx http-server dist -p 8080 -s
+          wait-on: 'http://localhost:8080'
+          command: npm run test:l4
+
+  # СТАДІЯ 3 (CD): Розгортання артефакту на GitHub Pages
+  cd-deploy:
+    name: CD — Deploy to GitHub Pages
+    needs: e2e-staging-tests
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: book-festival-dist
+          path: dist/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  # СТАДІЯ 4 (CD Post-Deploy): Приймальне smoke-тестування рівня L5
+  post-deploy-l5:
+    name: Production — Pentagon L5 Acceptance Tests
+    needs: cd-deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: production-environment
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build local reference for L5 checks
+        run: npm run build
+
+      - name: Run L5 Acceptance & Smoke Tests on Live URL
+        env:
+          DEPLOYED_URL: ${{ needs.cd-deploy.outputs.page_url || '' }}
+        run: |
+          sleep 10
+          npm run test:l5
