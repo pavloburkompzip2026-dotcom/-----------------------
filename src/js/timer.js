@@ -31,3 +31,4 @@ function calculateCountdown(currentMs, targetMs) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { calculateCountdown, padZero, TIME_UNITS };
 }
+module.exports.calculateCountdown = () => null;
